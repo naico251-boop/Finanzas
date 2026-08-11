@@ -85,8 +85,8 @@
   .err{color:var(--bad);font-size:13px;min-height:18px;margin:2px 0 4px;text-align:center}
 
   /* ---------- App ---------- */
-  .topbar{background:var(--teal);color:#fff;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0)) 16px;
-    position:sticky;top:0;z-index:20;padding-top:calc(12px + env(safe-area-inset-top,0))}
+  .topbar{background:var(--teal);color:#fff;padding:12px 16px 12px 16px;
+    position:relative;z-index:20;padding-top:calc(12px + env(safe-area-inset-top,0))}
   .topbar-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
   .topbar .brand-name{color:#fff;font-size:20px}
   .topbar .bulb path{stroke:#fff}
@@ -102,8 +102,8 @@
   .month-nav button{background:none;border:none;color:#fff;padding:8px 12px;font-size:16px}
   .month-nav button:hover{background:#16383f}
   .month-nav .lbl{padding:8px 6px;font-weight:600;min-width:118px;text-align:center;font-size:14px;text-transform:capitalize}
-  .nav{display:flex;gap:4px;overflow-x:auto;padding:10px 12px 0;background:var(--teal);position:sticky;
-    top:0;z-index:19;-webkit-overflow-scrolling:touch}
+  .nav{display:flex;gap:4px;overflow-x:auto;padding:10px 12px 0;background:var(--teal);position:relative;
+    -webkit-overflow-scrolling:touch}
   .nav::-webkit-scrollbar{display:none}
   .tab{white-space:nowrap;background:transparent;border:none;color:#a9bfc2;padding:9px 14px;border-radius:9px 9px 0 0;
     font-weight:600;font-size:14px}
@@ -702,17 +702,21 @@ function vMovimientos(){
       <div class="meta"><div class="t">${esc(nombreCat(m.categoria_id))}${sub?' · '+esc(sub):''}</div>
         <div class="s">${esc(String(m.fecha))}${m.nota?' · '+esc(m.nota):''}${origen}</div></div>
       <div class="amt ${m.tipo==='ingreso'?'ing':'eg'} num">${m.tipo==='ingreso'?'+':'−'}${fmt(m.monto)}</div>
+      <button class="iconlink" onclick="editarMov('${m.id}')" title="Editar">✎</button>
       <button class="iconlink del" onclick="borrarMovimiento('${m.id}')" title="Eliminar">✕</button></div>`;
   });
   h+=`</div>`;return h;
 }
-function abrirMovForm(){
+function abrirMovForm(mov){
   if(S.consolidado){toast('Elegí un espacio para agregar',true);return;}
+  const editando=!!mov, deCuenta=editando&&mov.cuenta_id;
   const hoy=todayISO();
-  abrirModal(`<h3>Nuevo movimiento</h3><p class="msub">Se registra por caja, con la fecha que indiques.</p>
+  window._mvEdit=editando?mov.id:null;
+  window._mvCuenta=deCuenta?mov.cuenta_id:null;
+  abrirModal(`<h3>${editando?'Editar movimiento':'Nuevo movimiento'}</h3><p class="msub">${deCuenta?'Movimiento de una cuenta: el monto se ajusta desde Cuentas. Acá podés cambiar cliente, fecha y nota.':'Se registra por caja, con la fecha que indiques.'}</p>
     <div class="seg" id="mv-seg" style="margin-bottom:14px">
-      <button id="mv-eg" class="on" onclick="mvTipo('egreso')">Egreso</button>
-      <button id="mv-ing" onclick="mvTipo('ingreso')">Ingreso</button></div>
+      <button id="mv-eg" class="on" ${deCuenta?'disabled style="opacity:.5"':''} onclick="mvTipo('egreso')">Egreso</button>
+      <button id="mv-ing" ${deCuenta?'disabled style="opacity:.5"':''} onclick="mvTipo('ingreso')">Ingreso</button></div>
     <div class="formgrid">
       <label class="field full"><span>Categoría</span>
         <div style="display:flex;gap:6px"><select id="mv-cat" class="input" onchange="mvLlenarSub()"></select><button type="button" class="addlink" onclick="mvAdd('cat',true)">＋ nueva</button></div>
@@ -722,13 +726,29 @@ function abrirMovForm(){
         <div style="display:flex;gap:6px"><select id="mv-sub" class="input"></select><button type="button" class="addlink" id="mv-addsub-btn" onclick="mvAdd('sub',true)">＋ nueva</button></div>
         <div class="miniadd" id="mv-addsub" style="display:none"><input class="input" id="mv-newsub" placeholder="Nombre" onkeydown="if(event.key==='Enter')mvCrearSub()"><button class="btn small teal" onclick="mvCrearSub()">✓</button><button class="btn small ghost" onclick="mvAdd('sub',false)">✕</button></div>
       </label>
-      <label class="field"><span>Monto (COP)</span><input id="mv-monto" class="input num" inputmode="numeric" placeholder="0"></label>
+      <label class="field"><span>Monto (COP)</span><input id="mv-monto" class="input num" inputmode="numeric" placeholder="0" ${deCuenta?'readonly style="background:var(--alabaster);color:var(--muted)"':''}></label>
       <label class="field"><span>Fecha</span><input id="mv-fecha" class="input" type="date" value="${hoy}"></label>
       <label class="field full"><span>Nota (opcional)</span><input id="mv-nota" class="input" placeholder="Detalle"></label>
     </div>
-    <div class="modal-actions"><button class="btn ghost" onclick="cerrarModal()">Cancelar</button><button class="btn" onclick="guardarMovimiento()">Guardar</button></div>`);
-  window._mvTipo='egreso';mvLlenarCat();
+    <div class="modal-actions"><button class="btn ghost" onclick="cerrarModal()">Cancelar</button><button class="btn" onclick="guardarMovimiento()">${editando?'Guardar cambios':'Guardar'}</button></div>`);
+  window._mvTipo=editando?mov.tipo:'egreso';
+  if(editando){$('mv-eg').classList.toggle('on',mov.tipo==='egreso');$('mv-ing').classList.toggle('on',mov.tipo==='ingreso');$('mv-seg').classList.toggle('ing',mov.tipo==='ingreso');}
+  mvLlenarCat();
+  if(editando){
+    mvSetOption('mv-cat',mov.categoria_id,nombreCat(mov.categoria_id));
+    $('mv-cat').value=mov.categoria_id||'';
+    mvLlenarSub();
+    if(mov.subcategoria_id){mvSetOption('mv-sub',mov.subcategoria_id,nombreSub(mov.subcategoria_id)||'—');$('mv-sub').value=mov.subcategoria_id;}
+    $('mv-monto').value=num(mov.monto);
+    $('mv-fecha').value=String(mov.fecha).slice(0,10);
+    $('mv-nota').value=mov.nota||'';
+  }
 }
+function mvSetOption(selId,val,label){
+  if(!val)return;const sel=$(selId);if(!sel)return;
+  if(![...sel.options].some(o=>o.value===val)){const o=document.createElement('option');o.value=val;o.textContent=label;sel.appendChild(o);}
+}
+function editarMov(id){const m=S.movimientos.find(x=>x.id===id);if(m)abrirMovForm(m);}
 function mvAdd(cual,show){
   if(cual==='cat'){$('mv-addcat').style.display=show?'flex':'none';if(show){$('mv-newcat').value='';$('mv-newcat').focus();}}
   else{$('mv-addsub').style.display=show?'flex':'none';if(show){$('mv-newsub').value='';$('mv-newsub').focus();}}
@@ -765,8 +785,20 @@ function mvLlenarSub(){
 async function guardarMovimiento(){
   const cid=$('mv-cat').value, sid=$('mv-sub').value||null, monto=num($('mv-monto').value.replace(/[^\d]/g,'')), fecha=$('mv-fecha').value, nota=$('mv-nota').value.trim();
   if(!cid){toast('Elegí una categoría',true);return;}
-  if(!monto||monto<=0){toast('Poné un monto válido',true);return;}
   if(!fecha){toast('Elegí la fecha',true);return;}
+  if(window._mvEdit){
+    const patch={categoria_id:cid,subcategoria_id:sid,fecha,nota:nota||null};
+    if(!window._mvCuenta){
+      if(!monto||monto<=0){toast('Poné un monto válido',true);return;}
+      patch.tipo=window._mvTipo;patch.monto=monto;
+    }
+    cerrarModal();
+    const{error}=await sb.from('movimientos').update(patch).eq('id',window._mvEdit);
+    if(error){toast('No se pudo guardar',true);return;}
+    await recargar();toast('Cambios guardados');
+    return;
+  }
+  if(!monto||monto<=0){toast('Poné un monto válido',true);return;}
   cerrarModal();
   const{error}=await sb.from('movimientos').insert({user_id:user.id,espacio_id:S.espacioId,tipo:window._mvTipo,categoria_id:cid,subcategoria_id:sid,monto,fecha,nota:nota||null});
   if(error){toast('No se pudo guardar',true);return;}

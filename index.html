@@ -75,6 +75,15 @@
   .input{width:100%;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--card);
     color:var(--ink);transition:border-color .15s,box-shadow .15s}
   .input:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px rgba(211,97,53,.16)}
+  .saldocard{padding:16px 18px}
+  .saldo-flow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .saldo-flow .sf{display:flex;flex-direction:column;gap:3px;text-align:center;flex:1;min-width:0}
+  .saldo-flow .sf-l{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .saldo-flow .sf-v{font-family:var(--serif,'Cormorant Garamond',serif);font-size:23px;font-weight:600;line-height:1.05;white-space:nowrap}
+  .saldo-flow .sf-v.neg{color:var(--bad)}
+  .saldo-flow .sf.big .sf-v{color:var(--orange);font-size:27px}
+  .saldo-flow .sf-op{color:var(--muted);font-size:16px;font-weight:600;flex:0 0 auto}
+  @media(max-width:520px){.saldo-flow .sf-v{font-size:17px}.saldo-flow .sf.big .sf-v{font-size:20px}.saldo-flow .sf-l{font-size:9.5px}}
   .pago-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line)}
   .pago-row:last-child{border-bottom:none}
   .pago-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
@@ -628,6 +637,13 @@ function mesSiguiente(){S.mes=nextYM(S.mes);renderApp();}
 /* ---------- cálculos ---------- */
 function movsMes(ym){return S.movimientos.filter(m=>String(m.fecha).slice(0,7)===ym);}
 function totales(ym){let ing=0,eg=0;movsMes(ym).forEach(m=>{const v=Number(m.monto)||0;if(m.tipo==='ingreso')ing+=v;else eg+=v;});return{ing,eg,saldo:ing-eg};}
+function saldoArrastrado(ym){
+  let s=0;
+  S.movimientos.forEach(m=>{
+    if(String(m.fecha).slice(0,7)<ym)s+=(m.tipo==='ingreso'?1:-1)*(Number(m.monto)||0);
+  });
+  return s;
+}
 function nombreCat(id){const c=S.categorias.find(x=>x.id===id);return c?c.nombre:'Sin categoría';}
 function nombreSub(id){const s=S.subcategorias.find(x=>x.id===id);return s?s.nombre:null;}
 function porCategoria(ym,tipo){
@@ -728,6 +744,7 @@ function deltaChip(cur,pv){
 }
 function vTablero(){
   const t=totales(S.mes), tp=totales(prevYM(S.mes));
+  const arr=saldoArrastrado(S.mes), disp=arr+t.saldo;
   const{notas,alertas}=analisis(S.mes);
   const pend=pendientes();
   const egCats=porCategoria(S.mes,'egreso'), ingCats=porCategoria(S.mes,'ingreso');
@@ -736,8 +753,15 @@ function vTablero(){
     <div class="totgrid">
       <div class="tot"><div class="lbl">Ingresos</div><div class="val num">${fmt(t.ing)}</div>${deltaChip(t.ing,tp.ing)}</div>
       <div class="tot eg"><div class="lbl">Egresos</div><div class="val num">${fmt(t.eg)}</div>${deltaChip(t.eg,tp.eg)}</div>
-      <div class="tot saldo${t.saldo<0?' neg':''}"><div class="lbl">Saldo</div><div class="val num">${fmt(t.saldo)}</div>${deltaChip(t.saldo,tp.saldo)}</div>
-    </div>`;
+      <div class="tot saldo${t.saldo<0?' neg':''}"><div class="lbl">Saldo del mes</div><div class="val num">${fmt(t.saldo)}</div>${deltaChip(t.saldo,tp.saldo)}</div>
+    </div>
+    <div class="card saldocard"><div class="saldo-flow">
+      <div class="sf"><div class="sf-l">Traés de antes</div><div class="sf-v num${arr<0?' neg':''}">${fmt(arr)}</div></div>
+      <div class="sf-op">+</div>
+      <div class="sf"><div class="sf-l">Saldo del mes</div><div class="sf-v num${t.saldo<0?' neg':''}">${fmt(t.saldo)}</div></div>
+      <div class="sf-op">=</div>
+      <div class="sf big"><div class="sf-l">Disponible</div><div class="sf-v num${disp<0?' neg':''}">${fmt(disp)}</div></div>
+    </div></div>`;
   // alertas y notas
   h+=`<div class="card alert-box"><div class="card-hd"><h3>Alertas y notas</h3><span class="chip">umbral ${UMBRAL}%</span></div>`;
   if(alertas.length===0&&notas.length===0)h+=`<div class="empty">Aún no hay suficientes datos para el análisis del mes.</div>`;
